@@ -3,18 +3,20 @@ import { Injectable } from '@angular/core';
 import { Subject } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { HttpClient } from '@angular/common/http';
+import { Router } from '@angular/router';
 
 @Injectable({providedIn: 'root'})
 export class PostsService {
   private posts: Post[] = [];
   private postsUpdated = new Subject<Post[]>();
   private baseUrl = 'http://localhost:3000';
+  private postsAPI = '/api/posts/';
 
-  constructor(private httpClient: HttpClient) {}
+  constructor(private httpClient: HttpClient, private router: Router) {}
 
   public getPosts() {
     this.httpClient
-    .get<{message: string, posts: any}>(this.baseUrl + '/api/posts')
+    .get<{message: string, posts: any}>(this.baseUrl + this.postsAPI)
     .pipe(map((postData) => {
       return postData.posts.map(post => {
         return {
@@ -34,22 +36,47 @@ export class PostsService {
     return this.postsUpdated.asObservable();
   }
 
-  public addPost(post: Post) {
+  public getPostById(id: string) {
+    return this.httpClient.get(this.baseUrl +  this.postsAPI + id);
+  }
+
+  public addPost(post) {
     this.httpClient
-    .post<{message: string, postId: string}>(this.baseUrl + '/api/posts', post)
+    .post<{message: string, postId: string}>(this.baseUrl +  this.postsAPI, post)
     .subscribe((res) => {
       post.id = res.postId;
       this.posts.push(post);
-      this.postsUpdated.next([...this.posts]);
+      this.postPushed();
+      this.navToHome();
     });
   }
 
-  deletePost(postId: string) {
+  public updatePost(post) {
+    this.httpClient.put(this.baseUrl +  this.postsAPI + post.id, post)
+    .subscribe(res => {
+      const updatedPosts = [...this.posts];
+      const oldPostIndex = updatedPosts.findIndex(p => p.id === post[`id`]);
+      updatedPosts[oldPostIndex] = post;
+      this.posts = updatedPosts;
+      this.postPushed();
+      this.navToHome();
+    });
+  }
+
+  public deletePost(postId: string) {
     this.httpClient
-    .delete(this.baseUrl + '/api/posts/' + postId)
+    .delete(this.baseUrl +  this.postsAPI + postId)
     .subscribe(() => {
       this.posts = this.posts.filter(post => post.id !== postId);
-      this.postsUpdated.next([...this.posts]);
+      this.postPushed();
     });
+  }
+
+  private postPushed() {
+    this.postsUpdated.next([...this.posts]);
+  }
+
+  private navToHome() {
+    this.router.navigate(['/']);
   }
 }
